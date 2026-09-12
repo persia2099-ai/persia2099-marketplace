@@ -1,0 +1,15 @@
+{
+  "name": "persia2099-marketplace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@metaplex-foundation/umi": "^1.4.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@metaplex-foundation/mpl-core": "^1.7.0",
+    "@solana/web3.js": "^1.98.4"
+  }
+}
