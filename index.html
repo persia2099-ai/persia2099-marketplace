@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Persia 2099 — Genesis Marketplace</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#05070b;color:#fff;font-family:Arial,sans-serif}
+.container{max-width:1100px;margin:auto;padding:35px 20px 60px}
+h1{text-align:center;letter-spacing:4px}
+.subtitle{text-align:center;color:#929bab;margin-bottom:35px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:#0b0f17;border:1px solid #222b3d;border-radius:16px;padding:15px}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}
+.card h2{font-size:17px;margin:14px 0 5px}
+.card p{color:#8e98aa;font-size:13px;margin:5px 0}
+.price{color:#fff;font-weight:bold;font-size:18px;margin:14px 0}
+button{width:100%;padding:13px;border:0;border-radius:9px;background:#7047ff;color:#fff;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.45}
+.status{text-align:center;margin:25px 0;color:#aab2c0}
+.back{display:block;text-align:center;margin-top:35px;color:#fff;text-decoration:none}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>GENESIS MARKETPLACE</h1>
+<div class="subtitle">PERSIA 2099 — GENESIS GUARDIANS</div>
+
+<div class="status" id="status">Connect Phantom to begin.</div>
+
+<div class="grid">
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/arash-2099.png">
+<h2>#001 ARASH 2099</h2>
+<p>THE CYBER WARRIOR</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('D4CBoNmuCm2GDSwJi2YHyxTMte66nJGNYE55WJWa4kzU')">BUY</button>
+</div>
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/cyrus-prime.png">
+<h2>#002 CYRUS PRIME</h2>
+<p>THE DIGITAL KING</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('47KQo8ddMP2q6z3zzs1E85f24cRgEFCe52iudvY2eG2K')">BUY</button>
+</div>
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/mithra.png">
+<h2>#003 MITHRA</h2>
+<p>THE GUARDIAN OF LIGHT</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('3ZUJcmFQMcGbk4MdAeGoY3DLkY1us2hxbbFNzeD1H9mZ')">BUY</button>
+</div>
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/Anahita.png">
+<h2>#004 ANAHITA</h2>
+<p>THE CYBER GODDESS</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('BmUjwD3D3bPDYGu7hoR38VNNnhbcSxBwJgnRxkFpCxGk')">BUY</button>
+</div>
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/rostam-x.png">
+<h2>#005 ROSTAM X</h2>
+<p>THE UNBREAKABLE LEGEND</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('9xHiNWXKfuhE2rVvCZXqNmD2gSLKj4KwRbRTTbLf2StS')">BUY</button>
+</div>
+
+<div class="card">
+<img src="https://persia2099-ai.github.io/persia2099/darius-zero.png">
+<h2>#006 DARIUS ZERO</h2>
+<p>THE ETERNAL SOVEREIGN</p>
+<div class="price">PRICE: TBD</div>
+<button onclick="buy('sFGhKnzJfbbnFTbiVMp93H4iamP1cJMhbfMydppjp6F')">BUY</button>
+</div>
+
+</div>
+
+<a class="back" href="https://persia2099-ai.github.io/persia2099/genesis.html">
+← BACK TO GENESIS
+</a>
+
+</div>
+
+<script>
+let wallet=null;
+
+async function connect(){
+if(!window.solana || !window.solana.isPhantom){
+document.getElementById("status").textContent="Phantom not detected.";
+return;
+}
+try{
+const r=await window.solana.connect();
+wallet=r.publicKey.toString();
+document.getElementById("status").textContent=
+"Connected: "+wallet.slice(0,6)+"..."+wallet.slice(-6);
+}catch(e){
+document.getElementById("status").textContent="Connection cancelled.";
+}
+}
+
+async function buy(asset){
+if(!wallet){
+await connect();
+return;
+}
+document.getElementById("status").textContent=
+"Selected Asset: "+asset.slice(0,8)+"... — Sale contract not activated yet.";
+}
+</script>
+
+</body>
+</html>
