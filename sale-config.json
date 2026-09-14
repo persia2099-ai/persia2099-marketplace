@@ -1,0 +1,44 @@
+{
+  "network": "devnet",
+  "collection": "6XGhHkPAHJ5XayXwn1p7t3XEUmyYEx3racfwnpbEwp6a",
+  "seller": "D3CaBnL7q2Fo4mmkxwTvwXrJcq4bXzHBctfQUEdnvfd5",
+  "currency": "SOL",
+  "guardians": [
+    {
+      "id": "001",
+      "name": "Arash 2099",
+      "asset": "D4CBoNmuCm2GDSwJi2YHyxTMte66nJGNYE55WJWa4kzU",
+      "price": 5
+    },
+    {
+      "id": "002",
+      "name": "Cyrus Prime",
+      "asset": "47KQo8ddMP2q6z3zzs1E85f24cRgEFCe52iudvY2eG2K",
+      "price": 5
+    },
+    {
+      "id": "003",
+      "name": "Mithra",
+      "asset": "3ZUJcmFQMcGbk4MdAeGoY3DLkY1us2hxbbFNzeD1H9mZ",
+      "price": 5
+    },
+    {
+      "id": "004",
+      "name": "Anahita",
+      "asset": "BmUjwD3D3bPDYGu7hoR38VNNnhbcSxBwJgnRxkFpCxGk",
+      "price": 5
+    },
+    {
+      "id": "005",
+      "name": "Rostam X",
+      "asset": "9xHiNWXKfuhE2rVvCZXqNmD2gSLKj4KwRbRTTbLf2StS",
+      "price": 5
+    },
+    {
+      "id": "006",
+      "name": "Darius Zero",
+      "asset": "sFGhKnzJfbbnFTbiVMp93H4iamP1cJMhbfMydppjp6F",
+      "price": 5
+    }
+  ]
+}
