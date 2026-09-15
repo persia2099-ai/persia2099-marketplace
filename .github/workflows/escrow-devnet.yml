@@ -14,24 +14,20 @@ jobs:
 
       - name: Configure Devnet deployer
         shell: bash
+        env:
+          DEPLOYER_KEYPAIR_JSON: ${{ secrets.DEPLOYER_KEYPAIR_JSON }}
         run: |
-          solana config set --url https://api.devnet.solana.com
-          solana-keygen new --no-bip39-passphrase --silent --outfile /tmp/deployer.json
-          solana config set --keypair /tmp/deployer.json
-          DEPLOYER=$(solana-keygen pubkey /tmp/deployer.json)
-          funded=false
-          for i in $(seq 1 15); do
-            echo "Devnet funding attempt $i/15 for $DEPLOYER"
-            if solana airdrop 1 "$DEPLOYER"; then
-              funded=true
-              break
-            fi
-            sleep 15
-          done
-          if [ "$funded" != "true" ]; then
-            echo "Devnet faucet is rate-limited. No deploy was attempted."
+          if [ -z "$DEPLOYER_KEYPAIR_JSON" ]; then
+            echo "Missing DEPLOYER_KEYPAIR_JSON GitHub Actions secret."
             exit 1
           fi
+          printf '%s' "$DEPLOYER_KEYPAIR_JSON" > /tmp/deployer.json
+          chmod 600 /tmp/deployer.json
+          solana config set --url https://api.devnet.solana.com
+          solana config set --keypair /tmp/deployer.json
+          echo "Deployer address:"
+          solana address
+          echo "Deployer balance:"
           solana balance
 
       - name: Generate program keypair
