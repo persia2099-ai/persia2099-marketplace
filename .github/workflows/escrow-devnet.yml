@@ -17,6 +17,7 @@ jobs:
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
+          set -e
           if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
             echo "Missing DEPLOYER_PRIVATE_KEY GitHub Actions secret."
             exit 1
@@ -24,73 +25,25 @@ jobs:
 
           rm -f /tmp/deployer.json
 
-          python3 - <<'PY'
-          import json, os, re
-          s = os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip('"\'')
-          words = s.split()
-          if len(words) in (12, 24):
-              with open("/tmp/deployer-recovery.txt", "w") as f:
-                  f.write(" ".join(words) + "\n")
-              print(f"Detected a {len(words)}-word recovery phrase.")
-          else:
-              s = ''.join(s.split())
-              labels = ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey=", "PrivateKey", "privatekey", "SecretKey:", "SecretKey=", "secretkey:", "secretkey=")
-              for prefix in labels:
-                  if s.startswith(prefix):
-                      s = s[len(prefix):].lstrip(':=')
-                      break
-              raw = None
-              try:
-                  candidate = json.loads(s)
-                  if isinstance(candidate, list) and len(candidate) == 64 and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
-                      raw = bytes(candidate)
-              except Exception:
-                  pass
-              if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}", s):
-                  raw = bytes.fromhex(s[2:] if s.startswith("0x") else s)
-              if raw is None:
-                  alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-                  indexes = {ch: i for i, ch in enumerate(alphabet)}
-                  n = 0
-                  for pos, ch in enumerate(s):
-                      if ch not in indexes:
-                          print("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase.")
-                          raise SystemExit(1)
-                      n = n * 58 + indexes[ch]
-                  raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
-                  leading = len(s) - len(s.lstrip("1"))
-                  raw = b"\x00" * leading + raw
-              if len(raw) != 64:
-                  print("The GitHub Secret does not contain a valid 64-byte Solana secret key.")
-                  raise SystemExit(1)
-              with open("/tmp/deployer.json", "w") as f:
-                  json.dump(list(raw), f)
-          PY
-
-          if [ -f /tmp/deployer-recovery.txt ]; then
-            npm install --no-save bip39 micro-ed25519-hdkey @solana/web3.js >/dev/null 2>&1
-            export DEPLOYER_MNEMONIC="$(cat /tmp/deployer-recovery.txt)"
-            node --input-type=module <<'NODE'
-            import { mnemonicToSeedSync } from 'bip39';
-            import { HDKey } from 'micro-ed25519-hdkey';
-            import { Keypair } from '@solana/web3.js';
-            import fs from 'fs';
-            const mnemonic = process.env.DEPLOYER_MNEMONIC.trim();
-            const seed = mnemonicToSeedSync(mnemonic);
-            const hd = HDKey.fromMasterSeed(seed);
-            const child = hd.derive("m/44'/501'/0'/0'");
-            const keypair = Keypair.fromSeed(child.privateKey);
-            fs.writeFileSync('/tmp/deployer.json', JSON.stringify(Array.from(keypair.secretKey)));
-            console.log('Recovered Phantom-style Solana account successfully.');
-            NODE
-            unset DEPLOYER_MNEMONIC
-            rm -f /tmp/deployer-recovery.txt
-          fi
-
-          if [ ! -f /tmp/deployer.json ]; then
-            echo "No deployer keypair was created."
-            exit 1
-          fi
+          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip("\"'"'\""); words=s.split();
+          if len(words) in (12,24): print("ERROR: DEPLOYER_PRIVATE_KEY contains a recovery phrase. Use Phantom -> Copy Private Key for a dedicated Devnet deployer wallet."); sys.exit(2)
+          s="".join(words); labels=("PrivateKey:","PrivateKey=","privatekey:","privatekey=","PrivateKey","privatekey","SecretKey:","SecretKey=","secretkey:","secretkey=");
+          for p in labels:
+              if s.startswith(p): s=s[len(p):].lstrip(":="); break
+          raw=None
+          try:
+              c=json.loads(s)
+              if isinstance(c,list) and len(c)==64 and all(isinstance(x,int) and 0<=x<=255 for x in c): raw=bytes(c)
+          except Exception: pass
+          if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}",s): raw=bytes.fromhex(s[2:] if s.startswith("0x") else s)
+          if raw is None:
+              a="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; idx={c:i for i,c in enumerate(a)}; n=0
+              for c in s:
+                  if c not in idx: print("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase."); sys.exit(1)
+                  n=n*58+idx[c]
+              raw=n.to_bytes((n.bit_length()+7)//8,"big"); raw=b"\\x00"*(len(s)-len(s.lstrip("1")))+raw
+          if len(raw)!=64: print("The GitHub Secret does not contain a valid 64-byte Solana secret key."); sys.exit(1)
+          json.dump(list(raw),open("/tmp/deployer.json","w"))'
 
           chmod 600 /tmp/deployer.json
           solana config set --url https://api.devnet.solana.com
@@ -103,6 +56,7 @@ jobs:
       - name: Generate program keypair
         shell: bash
         run: |
+          set -e
           mkdir -p escrow/target/deploy
           solana-keygen new --no-bip39-passphrase --silent --outfile escrow/target/deploy/persia2099_escrow-keypair.json
 
