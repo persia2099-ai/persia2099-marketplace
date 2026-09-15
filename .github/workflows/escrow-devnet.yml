@@ -1,0 +1,52 @@
+name: Build and Deploy Persia 2099 Escrow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container: solanafoundation/anchor:v0.31.1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Devnet deployer
+        shell: bash
+        run: |
+          solana config set --url https://api.devnet.solana.com
+          solana-keygen new --no-bip39-passphrase --silent --outfile /tmp/deployer.json
+          solana config set --keypair /tmp/deployer.json
+          for i in 1 2 3 4 5; do
+            if solana airdrop 2 "$(solana-keygen pubkey /tmp/deployer.json)"; then
+              break
+            fi
+            sleep 5
+          done
+          solana balance
+
+      - name: Generate program keypair
+        shell: bash
+        run: |
+          mkdir -p escrow/programs/persia2099-escrow
+          solana-keygen new --no-bip39-passphrase --silent --outfile escrow/programs/persia2099-escrow-keypair.json
+
+      - name: Sync program id
+        working-directory: escrow
+        run: anchor keys sync
+
+      - name: Build escrow program
+        working-directory: escrow
+        run: anchor build
+
+      - name: Deploy escrow to Devnet
+        working-directory: escrow
+        run: anchor deploy --provider.cluster devnet --provider.wallet /tmp/deployer.json
+
+      - name: Print deployed program id
+        working-directory: escrow
+        run: |
+          echo "Persia 2099 Escrow Program ID:"
+          anchor keys list
+          echo "Devnet Explorer: https://explorer.solana.com/address/$(anchor keys list | awk '/persia2099_escrow/ {print $2}')?cluster=devnet"
