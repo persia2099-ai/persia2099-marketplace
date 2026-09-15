@@ -18,19 +18,25 @@ jobs:
           solana config set --url https://api.devnet.solana.com
           solana-keygen new --no-bip39-passphrase --silent --outfile /tmp/deployer.json
           solana config set --keypair /tmp/deployer.json
+          funded=false
           for i in 1 2 3 4 5; do
             if solana airdrop 2 "$(solana-keygen pubkey /tmp/deployer.json)"; then
+              funded=true
               break
             fi
             sleep 5
           done
+          if [ "$funded" != "true" ]; then
+            echo "Devnet faucet did not fund the temporary deployer."
+            exit 1
+          fi
           solana balance
 
       - name: Generate program keypair
         shell: bash
         run: |
-          mkdir -p escrow/programs/persia2099-escrow
-          solana-keygen new --no-bip39-passphrase --silent --outfile escrow/programs/persia2099-escrow-keypair.json
+          mkdir -p escrow/target/deploy
+          solana-keygen new --no-bip39-passphrase --silent --outfile escrow/target/deploy/persia2099_escrow-keypair.json
 
       - name: Sync program id
         working-directory: escrow
@@ -49,4 +55,5 @@ jobs:
         run: |
           echo "Persia 2099 Escrow Program ID:"
           anchor keys list
-          echo "Devnet Explorer: https://explorer.solana.com/address/$(anchor keys list | awk '/persia2099_escrow/ {print $2}')?cluster=devnet"
+          PROGRAM_ID=$(anchor keys list | awk '/persia2099_escrow/ {print $2}')
+          echo "Devnet Explorer: https://explorer.solana.com/address/${PROGRAM_ID}?cluster=devnet"
