@@ -17,6 +17,7 @@ jobs:
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
+          set -e
           if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
             echo "Missing DEPLOYER_PRIVATE_KEY GitHub Actions secret."
             exit 1
@@ -24,19 +25,47 @@ jobs:
 
           rm -f /tmp/deployer.json
 
-          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip(chr(34)+chr(39)); words=s.split(); sys.exit("RECOVERY" if len(words) in (12,24) else 0)' 2>/dev/null || rc=$?
-          if [ "${rc:-0}" = "RECOVERY" ]; then
-            echo "ERROR: DEPLOYER_PRIVATE_KEY contains a recovery phrase."
-            echo "Use Phantom -> Settings -> Security & Privacy -> Export Private Key for the dedicated Devnet deployer wallet."
-            exit 1
-          fi
+          python3 - <<'PY'
+import json, os, re, sys
+s = os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip('"\'')
+if len(s.split()) in (12, 24):
+    print("ERROR: DEPLOYER_PRIVATE_KEY contains a recovery phrase.")
+    print("Use Phantom -> Settings -> Security & Privacy -> Export Private Key for the dedicated Devnet deployer wallet.")
+    sys.exit(1)
 
-          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip(chr(34)+chr(39)); s="".join(s.split()); labels=("PrivateKey:","PrivateKey=","privatekey:","privatekey=","PrivateKey","privatekey","SecretKey:","SecretKey=","secretkey:","secretkey="); [globals().__setitem__("s",s[len(p):].lstrip(":=")) for p in labels if s.startswith(p)]; raw=None; exec("""\ntry:\n candidate=json.loads(s)\n if isinstance(candidate,list) and len(candidate)==64 and all(isinstance(x,int) and 0<=x<=255 for x in candidate): raw=bytes(candidate)\nexcept Exception: pass\n"""); raw = raw if raw is not None else (bytes.fromhex(s[2:] if s.startswith("0x") else s) if re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}",s) else None);\nif raw is None:\n alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; idx={c:i for i,c in enumerate(alphabet)}; n=0\n for c in s:\n  if c not in idx: raise SystemExit("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase.")\n  n=n*58+idx[c]\n raw=n.to_bytes((n.bit_length()+7)//8,"big")\n raw=b"\\0"*(len(s)-len(s.lstrip("1")))+raw\nif len(raw)!=64: raise SystemExit("The GitHub Secret does not contain a valid 64-byte Solana secret key.")\njson.dump(list(raw),open("/tmp/deployer.json","w"))'
+s = ''.join(s.split())
+for label in ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey=", "PrivateKey", "privatekey", "SecretKey:", "SecretKey=", "secretkey:", "secretkey="):
+    if s.startswith(label):
+        s = s[len(label):].lstrip(':=')
+        break
 
-          if [ ! -f /tmp/deployer.json ]; then
-            echo "No deployer keypair was created."
-            exit 1
-          fi
+raw = None
+try:
+    candidate = json.loads(s)
+    if isinstance(candidate, list) and len(candidate) == 64 and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
+        raw = bytes(candidate)
+except Exception:
+    pass
+
+if raw is None and re.fullmatch(r'(?:0x)?[0-9a-fA-F]{128}', s):
+    raw = bytes.fromhex(s[2:] if s.startswith('0x') else s)
+
+if raw is None:
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    index = {c:i for i,c in enumerate(alphabet)}
+    n = 0
+    for c in s:
+        if c not in index:
+            raise SystemExit("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase.")
+        n = n * 58 + index[c]
+    raw = b'\x00' * (len(s) - len(s.lstrip('1'))) + n.to_bytes((n.bit_length()+7)//8, 'big')
+
+if len(raw) != 64:
+    raise SystemExit("The GitHub Secret does not contain a valid 64-byte Solana secret key.")
+
+with open('/tmp/deployer.json', 'w') as f:
+    json.dump(list(raw), f)
+PY
 
           chmod 600 /tmp/deployer.json
           solana config set --url https://api.devnet.solana.com
