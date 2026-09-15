@@ -22,87 +22,68 @@ jobs:
             exit 1
           fi
 
-          rm -f /tmp/deployer-recovery.txt /tmp/deployer.json
+          rm -f /tmp/deployer.json
 
           python3 - <<'PY'
-          import json, os, re, sys
-
-          s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
-          s = s.strip('"\'')
-
-          # If the secret is a complete BIP39 recovery phrase, save it only
-          # to a temporary file. The shell below performs the recovery step.
-          # The phrase is never printed.
+          import json, os, re
+          s = os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip('"\'')
           words = s.split()
           if len(words) in (12, 24):
-              print(f"Detected a {len(words)}-word recovery phrase.")
               with open("/tmp/deployer-recovery.txt", "w") as f:
                   f.write(" ".join(words) + "\n")
-              sys.exit(0)
-
-          s = ''.join(s.split())
-
-          labels = (
-              "PrivateKey:", "PrivateKey=", "privatekey:", "privatekey=",
-              "PrivateKey", "privatekey", "SecretKey:", "SecretKey=",
-              "secretkey:", "secretkey="
-          )
-          for prefix in labels:
-              if s.startswith(prefix):
-                  s = s[len(prefix):].lstrip(':=')
-                  break
-
-          raw = None
-
-          try:
-              candidate = json.loads(s)
-              if isinstance(candidate, list) and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
-                  if len(candidate) == 64:
-                      raw = bytes(candidate)
-          except Exception:
-              pass
-
-          if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}", s):
-              raw = bytes.fromhex(s[2:] if s.startswith("0x") else s)
-
-          if raw is None:
-              alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-              indexes = {ch: i for i, ch in enumerate(alphabet)}
-              n = 0
-              for pos, ch in enumerate(s):
-                  if ch not in indexes:
-                      print(f"Invalid private-key format at character position {pos}: {ch!r}")
-                      print("Use Phantom -> Copy Private Key, not the recovery phrase.")
-                      sys.exit(1)
-                  n = n * 58 + indexes[ch]
-
-              raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
-              leading = 0
-              for ch in s:
-                  if ch == "1":
-                      leading += 1
-                  else:
+              print(f"Detected a {len(words)}-word recovery phrase.")
+          else:
+              s = ''.join(s.split())
+              labels = ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey=", "PrivateKey", "privatekey", "SecretKey:", "SecretKey=", "secretkey:", "secretkey=")
+              for prefix in labels:
+                  if s.startswith(prefix):
+                      s = s[len(prefix):].lstrip(':=')
                       break
-              raw = b"\x00" * leading + raw
-
-          print(f"Decoded key length: {len(raw)} bytes")
-          if len(raw) != 64:
-              print("The GitHub Secret does not contain a valid 64-byte Solana secret key.")
-              sys.exit(1)
-
-          with open("/tmp/deployer.json", "w") as f:
-              json.dump(list(raw), f)
+              raw = None
+              try:
+                  candidate = json.loads(s)
+                  if isinstance(candidate, list) and len(candidate) == 64 and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
+                      raw = bytes(candidate)
+              except Exception:
+                  pass
+              if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}", s):
+                  raw = bytes.fromhex(s[2:] if s.startswith("0x") else s)
+              if raw is None:
+                  alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+                  indexes = {ch: i for i, ch in enumerate(alphabet)}
+                  n = 0
+                  for pos, ch in enumerate(s):
+                      if ch not in indexes:
+                          print("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase.")
+                          raise SystemExit(1)
+                      n = n * 58 + indexes[ch]
+                  raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+                  leading = len(s) - len(s.lstrip("1"))
+                  raw = b"\x00" * leading + raw
+              if len(raw) != 64:
+                  print("The GitHub Secret does not contain a valid 64-byte Solana secret key.")
+                  raise SystemExit(1)
+              with open("/tmp/deployer.json", "w") as f:
+                  json.dump(list(raw), f)
           PY
 
-          # solana-keygen recovery uses a TTY for its interactive prompts.
-          # GitHub Actions does not provide one, so allocate a temporary PTY
-          # with `script` and feed the phrase, blank BIP39 passphrase, and y.
           if [ -f /tmp/deployer-recovery.txt ]; then
-            {
-              cat /tmp/deployer-recovery.txt
-              printf '\n\n'
-              printf 'y\n'
-            } | script -q -e -c "solana-keygen recover --force 'prompt:?key=0/0' --outfile /tmp/deployer.json" /dev/null
+            npm install --no-save bip39 micro-ed25519-hdkey @solana/web3.js >/dev/null 2>&1
+            export DEPLOYER_MNEMONIC="$(cat /tmp/deployer-recovery.txt)"
+            node --input-type=module <<'NODE'
+            import { mnemonicToSeedSync } from 'bip39';
+            import { HDKey } from 'micro-ed25519-hdkey';
+            import { Keypair } from '@solana/web3.js';
+            import fs from 'fs';
+            const mnemonic = process.env.DEPLOYER_MNEMONIC.trim();
+            const seed = mnemonicToSeedSync(mnemonic);
+            const hd = HDKey.fromMasterSeed(seed);
+            const child = hd.derive("m/44'/501'/0'/0'");
+            const keypair = Keypair.fromSeed(child.privateKey);
+            fs.writeFileSync('/tmp/deployer.json', JSON.stringify(Array.from(keypair.secretKey)));
+            console.log('Recovered Phantom-style Solana account successfully.');
+            NODE
+            unset DEPLOYER_MNEMONIC
             rm -f /tmp/deployer-recovery.txt
           fi
 
