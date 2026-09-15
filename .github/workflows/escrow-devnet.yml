@@ -26,28 +26,45 @@ jobs:
           import json, os, sys
 
           s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
-          s = "".join(s.split())
+          s = s.strip('"\'')
+          s = ''.join(s.split())
+
           for prefix in ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey="):
               if s.startswith(prefix):
                   s = s[len(prefix):]
                   break
 
-          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-          n = 0
-          for ch in s:
-              if ch not in alphabet:
-                  print(f"Invalid Base58 private key character: {repr(ch)}")
-                  sys.exit(1)
-              n = n * 58 + alphabet.index(ch)
+          raw = None
 
-          raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
-          leading = 0
-          for ch in s:
-              if ch == "1":
-                  leading += 1
-              else:
-                  break
-          raw = b"\x00" * leading + raw
+          # Support Phantom values copied as a JSON byte array.
+          try:
+              candidate = json.loads(s)
+              if isinstance(candidate, list) and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
+                  if len(candidate) == 64:
+                      raw = bytes(candidate)
+          except Exception:
+              pass
+
+          # Otherwise decode the normal Base58 Solana secret-key format.
+          if raw is None:
+              alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+              indexes = {ch: i for i, ch in enumerate(alphabet)}
+              n = 0
+              for pos, ch in enumerate(s):
+                  if ch not in indexes:
+                      print(f"Invalid Base58 character at position {pos}: {repr(ch)} (codepoint {ord(ch)})")
+                      print("Use Phantom -> Copy Private Key, and paste the complete value into the GitHub Secret.")
+                      sys.exit(1)
+                  n = n * 58 + indexes[ch]
+
+              raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+              leading = 0
+              for ch in s:
+                  if ch == "1":
+                      leading += 1
+                  else:
+                      break
+              raw = b"\x00" * leading + raw
 
           print(f"Decoded key length: {len(raw)} bytes")
           if len(raw) != 64:
