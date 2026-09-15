@@ -31,8 +31,8 @@ jobs:
           s = s.strip('"\'')
 
           # If the secret is a complete BIP39 recovery phrase, save it only
-          # to a temporary file and exit successfully. The shell below then
-          # performs the recovery step. The phrase is never printed.
+          # to a temporary file. The shell below performs the recovery step.
+          # The phrase is never printed.
           words = s.split()
           if len(words) in (12, 24):
               print(f"Detected a {len(words)}-word recovery phrase.")
@@ -94,11 +94,15 @@ jobs:
               json.dump(list(raw), f)
           PY
 
-          # A recovery phrase is indicated by the temporary marker file.
-          # Do not use a non-zero Python exit code here: GitHub Actions/bash
-          # can stop immediately on non-zero commands before rc handling.
+          # solana-keygen recovery uses a TTY for its interactive prompts.
+          # GitHub Actions does not provide one, so allocate a temporary PTY
+          # with `script` and feed the phrase, blank BIP39 passphrase, and y.
           if [ -f /tmp/deployer-recovery.txt ]; then
-            printf '%s\n\n' "$(cat /tmp/deployer-recovery.txt)" | solana-keygen recover --force 'prompt:?key=0/0' --outfile /tmp/deployer.json
+            {
+              cat /tmp/deployer-recovery.txt
+              printf '\n\n'
+              printf 'y\n'
+            } | script -q -e -c "solana-keygen recover --force 'prompt:?key=0/0' --outfile /tmp/deployer.json" /dev/null
             rm -f /tmp/deployer-recovery.txt
           fi
 
