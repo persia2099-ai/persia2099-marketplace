@@ -17,7 +17,6 @@ jobs:
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
-          set -e
           if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
             echo "Missing DEPLOYER_PRIVATE_KEY GitHub Actions secret."
             exit 1
@@ -25,25 +24,19 @@ jobs:
 
           rm -f /tmp/deployer.json
 
-          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip("\"'"'\""); words=s.split();
-          if len(words) in (12,24): print("ERROR: DEPLOYER_PRIVATE_KEY contains a recovery phrase. Use Phantom -> Copy Private Key for a dedicated Devnet deployer wallet."); sys.exit(2)
-          s="".join(words); labels=("PrivateKey:","PrivateKey=","privatekey:","privatekey=","PrivateKey","privatekey","SecretKey:","SecretKey=","secretkey:","secretkey=");
-          for p in labels:
-              if s.startswith(p): s=s[len(p):].lstrip(":="); break
-          raw=None
-          try:
-              c=json.loads(s)
-              if isinstance(c,list) and len(c)==64 and all(isinstance(x,int) and 0<=x<=255 for x in c): raw=bytes(c)
-          except Exception: pass
-          if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}",s): raw=bytes.fromhex(s[2:] if s.startswith("0x") else s)
-          if raw is None:
-              a="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; idx={c:i for i,c in enumerate(a)}; n=0
-              for c in s:
-                  if c not in idx: print("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase."); sys.exit(1)
-                  n=n*58+idx[c]
-              raw=n.to_bytes((n.bit_length()+7)//8,"big"); raw=b"\\x00"*(len(s)-len(s.lstrip("1")))+raw
-          if len(raw)!=64: print("The GitHub Secret does not contain a valid 64-byte Solana secret key."); sys.exit(1)
-          json.dump(list(raw),open("/tmp/deployer.json","w"))'
+          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip(chr(34)+chr(39)); words=s.split(); sys.exit("RECOVERY" if len(words) in (12,24) else 0)' 2>/dev/null || rc=$?
+          if [ "${rc:-0}" = "RECOVERY" ]; then
+            echo "ERROR: DEPLOYER_PRIVATE_KEY contains a recovery phrase."
+            echo "Use Phantom -> Settings -> Security & Privacy -> Export Private Key for the dedicated Devnet deployer wallet."
+            exit 1
+          fi
+
+          python3 -c 'import json,os,re,sys; s=os.environ["DEPLOYER_PRIVATE_KEY"].strip().strip(chr(34)+chr(39)); s="".join(s.split()); labels=("PrivateKey:","PrivateKey=","privatekey:","privatekey=","PrivateKey","privatekey","SecretKey:","SecretKey=","secretkey:","secretkey="); [globals().__setitem__("s",s[len(p):].lstrip(":=")) for p in labels if s.startswith(p)]; raw=None; exec("""\ntry:\n candidate=json.loads(s)\n if isinstance(candidate,list) and len(candidate)==64 and all(isinstance(x,int) and 0<=x<=255 for x in candidate): raw=bytes(candidate)\nexcept Exception: pass\n"""); raw = raw if raw is not None else (bytes.fromhex(s[2:] if s.startswith("0x") else s) if re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}",s) else None);\nif raw is None:\n alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; idx={c:i for i,c in enumerate(alphabet)}; n=0\n for c in s:\n  if c not in idx: raise SystemExit("Invalid private-key format. Use Phantom -> Copy Private Key, not the recovery phrase.")\n  n=n*58+idx[c]\n raw=n.to_bytes((n.bit_length()+7)//8,"big")\n raw=b"\\0"*(len(s)-len(s.lstrip("1")))+raw\nif len(raw)!=64: raise SystemExit("The GitHub Secret does not contain a valid 64-byte Solana secret key.")\njson.dump(list(raw),open("/tmp/deployer.json","w"))'
+
+          if [ ! -f /tmp/deployer.json ]; then
+            echo "No deployer keypair was created."
+            exit 1
+          fi
 
           chmod 600 /tmp/deployer.json
           solana config set --url https://api.devnet.solana.com
@@ -56,7 +49,6 @@ jobs:
       - name: Generate program keypair
         shell: bash
         run: |
-          set -e
           mkdir -p escrow/target/deploy
           solana-keygen new --no-bip39-passphrase --silent --outfile escrow/target/deploy/persia2099_escrow-keypair.json
 
