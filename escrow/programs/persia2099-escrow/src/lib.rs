@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{self, Transfer};
 use mpl_core::instructions::TransferV1CpiBuilder;
 
-// The program id is synchronized automatically by the deployment workflow.
 declare_id!("11111111111111111111111111111111");
 
 pub const COLLECTION: Pubkey = pubkey!("6XGhHkPAHJ5XayXwn1p7t3XEUmyYEx3racfwnpbEwp6a");
@@ -15,18 +14,21 @@ pub mod persia2099_escrow {
         require!(price_lamports > 0, ErrorCode::InvalidPrice);
         require_keys_eq!(ctx.accounts.collection.key(), COLLECTION, ErrorCode::InvalidCollection);
 
-        let listing = &mut ctx.accounts.listing;
-        listing.seller = ctx.accounts.seller.key();
-        listing.asset = ctx.accounts.asset.key();
-        listing.collection = ctx.accounts.collection.key();
-        listing.price_lamports = price_lamports;
-        listing.bump = ctx.bumps.listing;
+        let seller_key = ctx.accounts.seller.key();
+        let asset_key = ctx.accounts.asset.key();
+        let collection_key = ctx.accounts.collection.key();
+        let bump = ctx.bumps.listing;
 
-        let seeds: &[&[u8]] = &[
-            b"listing",
-            ctx.accounts.asset.key().as_ref(),
-            &[listing.bump],
-        ];
+        {
+            let listing = &mut ctx.accounts.listing;
+            listing.seller = seller_key;
+            listing.asset = asset_key;
+            listing.collection = collection_key;
+            listing.price_lamports = price_lamports;
+            listing.bump = bump;
+        }
+
+        let seeds: &[&[u8]] = &[b"listing", asset_key.as_ref(), &[bump]];
 
         TransferV1CpiBuilder::new(&ctx.accounts.mpl_core.to_account_info())
             .asset(&ctx.accounts.asset.to_account_info())
@@ -39,8 +41,8 @@ pub mod persia2099_escrow {
             .map_err(|_| error!(ErrorCode::AssetTransferFailed))?;
 
         emit!(ListingCreated {
-            seller: listing.seller,
-            asset: listing.asset,
+            seller: seller_key,
+            asset: asset_key,
             price_lamports,
         });
 
@@ -54,8 +56,9 @@ pub mod persia2099_escrow {
         require!(ctx.accounts.buyer.key() != ctx.accounts.seller.key(), ErrorCode::SellerCannotBuy);
 
         let amount = ctx.accounts.listing.price_lamports;
+        let bump = ctx.accounts.listing.bump;
+        let asset_key = ctx.accounts.asset.key();
 
-        // Payment and asset transfer are in the same Solana transaction.
         system_program::transfer(
             CpiContext::new(
                 ctx.accounts.system_program.to_account_info(),
@@ -67,8 +70,6 @@ pub mod persia2099_escrow {
             amount,
         )?;
 
-        let bump = ctx.accounts.listing.bump;
-        let asset_key = ctx.accounts.asset.key();
         let seeds: &[&[u8]] = &[b"listing", asset_key.as_ref(), &[bump]];
 
         TransferV1CpiBuilder::new(&ctx.accounts.mpl_core.to_account_info())
@@ -122,13 +123,7 @@ pub mod persia2099_escrow {
 #[derive(Accounts)]
 #[instruction(price_lamports: u64)]
 pub struct CreateListing<'info> {
-    #[account(
-        init,
-        payer = seller,
-        space = Listing::SPACE,
-        seeds = [b"listing", asset.key().as_ref()],
-        bump
-    )]
+    #[account(init, payer = seller, space = Listing::SPACE, seeds = [b"listing", asset.key().as_ref()], bump)]
     pub listing: Account<'info, Listing>,
     #[account(mut)]
     pub asset: UncheckedAccount<'info>,
@@ -136,40 +131,32 @@ pub struct CreateListing<'info> {
     pub collection: UncheckedAccount<'info>,
     #[account(mut)]
     pub seller: Signer<'info>,
+    /// CHECK: Fixed Metaplex Core program account; the CPI validates the program id.
     pub mpl_core: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct Buy<'info> {
-    #[account(
-        mut,
-        seeds = [b"listing", asset.key().as_ref()],
-        bump = listing.bump,
-        close = seller
-    )]
+    #[account(mut, seeds = [b"listing", asset.key().as_ref()], bump = listing.bump, close = seller)]
     pub listing: Account<'info, Listing>,
     #[account(mut)]
     pub asset: UncheckedAccount<'info>,
     #[account(address = COLLECTION)]
     pub collection: UncheckedAccount<'info>,
-    /// CHECK: The seller is stored and verified against the listing.
+    /// CHECK: Seller is authenticated by the listing's stored seller key.
     #[account(mut)]
     pub seller: UncheckedAccount<'info>,
     #[account(mut)]
     pub buyer: Signer<'info>,
+    /// CHECK: Fixed Metaplex Core program account; the CPI validates the program id.
     pub mpl_core: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct CancelListing<'info> {
-    #[account(
-        mut,
-        seeds = [b"listing", asset.key().as_ref()],
-        bump = listing.bump,
-        close = seller
-    )]
+    #[account(mut, seeds = [b"listing", asset.key().as_ref()], bump = listing.bump, close = seller)]
     pub listing: Account<'info, Listing>,
     #[account(mut)]
     pub asset: UncheckedAccount<'info>,
@@ -177,6 +164,7 @@ pub struct CancelListing<'info> {
     pub collection: UncheckedAccount<'info>,
     #[account(mut)]
     pub seller: Signer<'info>,
+    /// CHECK: Fixed Metaplex Core program account; the CPI validates the program id.
     pub mpl_core: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
