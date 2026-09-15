@@ -15,13 +15,41 @@ jobs:
       - name: Configure Devnet deployer
         shell: bash
         env:
-          DEPLOYER_KEYPAIR_JSON: ${{ secrets.DEPLOYER_KEYPAIR_JSON }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
-          if [ -z "$DEPLOYER_KEYPAIR_JSON" ]; then
-            echo "Missing DEPLOYER_KEYPAIR_JSON GitHub Actions secret."
+          if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
+            echo "Missing DEPLOYER_PRIVATE_KEY GitHub Actions secret."
             exit 1
           fi
-          printf '%s' "$DEPLOYER_KEYPAIR_JSON" > /tmp/deployer.json
+
+          python3 - <<'PY'
+          import base64, json, os, sys
+
+          s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
+          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+          n = 0
+          for ch in s:
+              if ch not in alphabet:
+                  print("Invalid Base58 private key.")
+                  sys.exit(1)
+              n = n * 58 + alphabet.index(ch)
+          raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+          leading = 0
+          for ch in s:
+              if ch == "1":
+                  leading += 1
+              else:
+                  break
+          raw = b"\x00" * leading + raw
+
+          if len(raw) != 64:
+              print(f"Decoded private key is {len(raw)} bytes; expected 64 bytes for a Solana keypair.")
+              sys.exit(1)
+
+          with open("/tmp/deployer.json", "w") as f:
+              json.dump(list(raw), f)
+          PY
+
           chmod 600 /tmp/deployer.json
           solana config set --url https://api.devnet.solana.com
           solana config set --keypair /tmp/deployer.json
