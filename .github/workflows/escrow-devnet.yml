@@ -22,19 +22,23 @@ jobs:
             exit 1
           fi
 
+          rm -f /tmp/deployer-recovery.txt /tmp/deployer.json
+
           python3 - <<'PY'
           import json, os, re, sys
 
           s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
           s = s.strip('"\'')
 
-          # Keep word boundaries for a possible recovery phrase.
+          # If the secret is a complete BIP39 recovery phrase, save it only
+          # to a temporary file and exit successfully. The shell below then
+          # performs the recovery step. The phrase is never printed.
           words = s.split()
           if len(words) in (12, 24):
               print(f"Detected a {len(words)}-word recovery phrase.")
               with open("/tmp/deployer-recovery.txt", "w") as f:
                   f.write(" ".join(words) + "\n")
-              sys.exit(10)
+              sys.exit(0)
 
           s = ''.join(s.split())
 
@@ -45,7 +49,7 @@ jobs:
           )
           for prefix in labels:
               if s.startswith(prefix):
-                  s = s[len(prefix):].lstrip(':=' )
+                  s = s[len(prefix):].lstrip(':=')
                   break
 
           raw = None
@@ -69,7 +73,6 @@ jobs:
                   if ch not in indexes:
                       print(f"Invalid private-key format at character position {pos}: {ch!r}")
                       print("Use Phantom -> Copy Private Key, not the recovery phrase.")
-                      print("Alternatively, if this Secret contains the 12/24-word recovery phrase, keep the complete phrase and rerun; the workflow supports that format too.")
                       sys.exit(1)
                   n = n * 58 + indexes[ch]
 
@@ -91,14 +94,17 @@ jobs:
               json.dump(list(raw), f)
           PY
 
-          rc=$?
-          if [ "$rc" -eq 10 ]; then
-            # Recover the first Phantom-style Solana account from a BIP39 phrase.
-            # The phrase itself is never printed.
+          # A recovery phrase is indicated by the temporary marker file.
+          # Do not use a non-zero Python exit code here: GitHub Actions/bash
+          # can stop immediately on non-zero commands before rc handling.
+          if [ -f /tmp/deployer-recovery.txt ]; then
             printf '%s\n\n' "$(cat /tmp/deployer-recovery.txt)" | solana-keygen recover --force 'prompt:?key=0/0' --outfile /tmp/deployer.json
             rm -f /tmp/deployer-recovery.txt
-          elif [ "$rc" -ne 0 ]; then
-            exit "$rc"
+          fi
+
+          if [ ! -f /tmp/deployer.json ]; then
+            echo "No deployer keypair was created."
+            exit 1
           fi
 
           chmod 600 /tmp/deployer.json
