@@ -23,16 +23,23 @@ jobs:
           fi
 
           python3 - <<'PY'
-          import base64, json, os, sys
+          import json, os, sys
 
           s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
+          s = "".join(s.split())
+          for prefix in ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey="):
+              if s.startswith(prefix):
+                  s = s[len(prefix):]
+                  break
+
           alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
           n = 0
           for ch in s:
               if ch not in alphabet:
-                  print("Invalid Base58 private key.")
+                  print(f"Invalid Base58 private key character: {repr(ch)}")
                   sys.exit(1)
               n = n * 58 + alphabet.index(ch)
+
           raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
           leading = 0
           for ch in s:
@@ -42,8 +49,10 @@ jobs:
                   break
           raw = b"\x00" * leading + raw
 
+          print(f"Decoded key length: {len(raw)} bytes")
           if len(raw) != 64:
-              print(f"Decoded private key is {len(raw)} bytes; expected 64 bytes for a Solana keypair.")
+              print("The GitHub Secret is not a 64-byte Solana secret key.")
+              print("Replace DEPLOYER_PRIVATE_KEY with the value from Phantom -> Copy Private Key.")
               sys.exit(1)
 
           with open("/tmp/deployer.json", "w") as f:
