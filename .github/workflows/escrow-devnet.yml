@@ -23,20 +23,26 @@ jobs:
           fi
 
           python3 - <<'PY'
-          import json, os, sys
+          import json, os, sys, re
 
           s = os.environ["DEPLOYER_PRIVATE_KEY"].strip()
           s = s.strip('"\'')
           s = ''.join(s.split())
 
-          for prefix in ("PrivateKey:", "PrivateKey=", "privatekey:", "privatekey="):
+          # Accept common labels around the copied key without printing the secret.
+          labels = (
+              "PrivateKey:", "PrivateKey=", "privatekey:", "privatekey=",
+              "PrivateKey", "privatekey", "SecretKey:", "SecretKey=",
+              "secretkey:", "secretkey="
+          )
+          for prefix in labels:
               if s.startswith(prefix):
-                  s = s[len(prefix):]
+                  s = s[len(prefix):].lstrip(':=' )
                   break
 
           raw = None
 
-          # Support Phantom values copied as a JSON byte array.
+          # Phantom can provide a JSON byte array.
           try:
               candidate = json.loads(s)
               if isinstance(candidate, list) and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
@@ -45,15 +51,19 @@ jobs:
           except Exception:
               pass
 
-          # Otherwise decode the normal Base58 Solana secret-key format.
+          # Support a 64-byte hex secret key if supplied by a wallet/export tool.
+          if raw is None and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{128}", s):
+              raw = bytes.fromhex(s[2:] if s.startswith("0x") else s)
+
+          # Otherwise decode normal Solana Base58 secret-key format.
           if raw is None:
               alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
               indexes = {ch: i for i, ch in enumerate(alphabet)}
               n = 0
               for pos, ch in enumerate(s):
                   if ch not in indexes:
-                      print(f"Invalid Base58 character at position {pos}: {repr(ch)} (codepoint {ord(ch)})")
-                      print("Use Phantom -> Copy Private Key, and paste the complete value into the GitHub Secret.")
+                      print(f"Invalid private-key format at character position {pos}.")
+                      print("The GitHub Secret must be the complete value from Phantom -> Copy Private Key (or a 64-byte JSON array / 128-character hex key).")
                       sys.exit(1)
                   n = n * 58 + indexes[ch]
 
@@ -68,8 +78,8 @@ jobs:
 
           print(f"Decoded key length: {len(raw)} bytes")
           if len(raw) != 64:
-              print("The GitHub Secret is not a 64-byte Solana secret key.")
-              print("Replace DEPLOYER_PRIVATE_KEY with the value from Phantom -> Copy Private Key.")
+              print("The GitHub Secret does not contain a valid 64-byte Solana secret key.")
+              print("Replace DEPLOYER_PRIVATE_KEY with the complete value copied from Phantom.")
               sys.exit(1)
 
           with open("/tmp/deployer.json", "w") as f:
