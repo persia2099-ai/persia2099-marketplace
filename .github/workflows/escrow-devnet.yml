@@ -2,9 +2,13 @@ name: Persia 2099 Escrow Deploy
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/escrow-devnet.yml'
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container: solanafoundation/anchor:v0.31.1
 
