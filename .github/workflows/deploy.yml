@@ -91,10 +91,9 @@ jobs:
           export RUSTUP_TOOLCHAIN=1.85.0
           echo "Host Cargo:"
           rustup run 1.85.0 cargo --version
-          echo "Solana platform tools:"
-          cargo build-sbf --version
-          echo "Building with platform-tools v1.52..."
-          anchor build --tools-version v1.52
+          echo "Solana build tool:"
+          solana-cargo-build-sbf --version
+          anchor build --solana-version 2.1.7
 
       - name: Deploy escrow to Devnet
         working-directory: escrow
