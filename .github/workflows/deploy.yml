@@ -6,9 +6,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    container: solanafoundation/anchor:v0.31.1
+    container: solanafoundation/anchor:v0.32.1
     env:
-      RUSTUP_TOOLCHAIN: 1.85.0
+      RUSTUP_TOOLCHAIN: 1.89.0
 
     steps:
       - name: Checkout
@@ -77,28 +77,28 @@ jobs:
         shell: bash
         run: |
           unset RUSTUP_TOOLCHAIN
-          rustup toolchain install 1.85.0 --profile minimal
-          rustup default 1.85.0
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
           echo "Rust toolchain:"
-          rustup run 1.85.0 rustc --version
+          rustup run 1.89.0 rustc --version
           echo "Cargo:"
-          rustup run 1.85.0 cargo --version
+          rustup run 1.89.0 cargo --version
           echo "Solana build tool:"
-          solana-cargo-build-sbf --version
+          cargo build-sbf --version
 
       - name: Build escrow program
         working-directory: escrow
         shell: bash
         run: |
-          export RUSTUP_TOOLCHAIN=1.85.0
-          echo "Using direct cargo-build-sbf (bypassing Anchor build wrapper)."
+          export RUSTUP_TOOLCHAIN=1.89.0
+          echo "Building with the Solana SBF toolchain from Anchor 0.32.1."
           cargo build-sbf
 
       - name: Deploy escrow to Devnet
         working-directory: escrow
         shell: bash
         run: |
-          export RUSTUP_TOOLCHAIN=1.85.0
+          export RUSTUP_TOOLCHAIN=1.89.0
           solana program deploy target/deploy/persia2099_escrow.so \
             --program-id target/deploy/persia2099_escrow-keypair.json \
             --url https://api.devnet.solana.com \
