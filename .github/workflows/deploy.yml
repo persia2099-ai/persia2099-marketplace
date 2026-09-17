@@ -71,6 +71,14 @@ jobs:
         working-directory: escrow
         run: anchor keys sync
 
+      - name: Configure Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.83.0 --profile minimal
+          rustup default 1.83.0
+          rustc --version
+          cargo --version
+
       - name: Build escrow program
         working-directory: escrow
         run: anchor build
