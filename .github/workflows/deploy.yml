@@ -83,29 +83,31 @@ jobs:
           rustup run 1.85.0 rustc --version
           echo "Cargo:"
           rustup run 1.85.0 cargo --version
+          echo "Solana build tool:"
+          solana-cargo-build-sbf --version
 
       - name: Build escrow program
         working-directory: escrow
         shell: bash
         run: |
           export RUSTUP_TOOLCHAIN=1.85.0
-          echo "Host Cargo:"
-          rustup run 1.85.0 cargo --version
-          echo "Solana build tool:"
-          solana-cargo-build-sbf --version
-          anchor build --solana-version 2.1.7
+          echo "Using direct cargo-build-sbf (bypassing Anchor build wrapper)."
+          cargo build-sbf
 
       - name: Deploy escrow to Devnet
         working-directory: escrow
         shell: bash
         run: |
           export RUSTUP_TOOLCHAIN=1.85.0
-          anchor deploy --provider.cluster devnet --provider.wallet /tmp/deployer.json
+          solana program deploy target/deploy/persia2099_escrow.so \
+            --program-id target/deploy/persia2099_escrow-keypair.json \
+            --url https://api.devnet.solana.com \
+            --keypair /tmp/deployer.json
 
       - name: Print deployed program id
         working-directory: escrow
         run: |
           echo "Persia 2099 Escrow Program ID:"
-          anchor keys list
-          PROGRAM_ID=$(anchor keys list | awk '/persia2099_escrow/ {print $2}')
+          PROGRAM_ID=$(solana address -k target/deploy/persia2099_escrow-keypair.json)
+          echo "$PROGRAM_ID"
           echo "Devnet Explorer: https://explorer.solana.com/address/${PROGRAM_ID}?cluster=devnet"
