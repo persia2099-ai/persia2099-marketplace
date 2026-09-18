@@ -69,9 +69,32 @@ jobs:
           mkdir -p escrow/target/deploy
           solana-keygen new --no-bip39-passphrase --silent --outfile escrow/target/deploy/persia2099_escrow-keypair.json
 
-      - name: Sync program id
+      - name: Set program id
         working-directory: escrow
-        run: anchor keys sync
+        shell: bash
+        run: |
+          set -e
+          PROGRAM_ID=$(solana-keygen pubkey target/deploy/persia2099_escrow-keypair.json)
+          echo "Program ID: $PROGRAM_ID"
+          python3 - "$PROGRAM_ID" <<'PY'
+          import pathlib, re, sys
+          pid = sys.argv[1]
+
+          lib = pathlib.Path("programs/persia2099-escrow/src/lib.rs")
+          text = lib.read_text()
+          text, count = re.subn(r'declare_id!\("[^"]+"\)', f'declare_id!("{pid}")', text, count=1)
+          if count != 1:
+              raise SystemExit("declare_id! not found in lib.rs")
+          lib.write_text(text)
+
+          cfg = pathlib.Path("Anchor.toml")
+          text = cfg.read_text()
+          text, count = re.subn(r'(persia2099_escrow\s*=\s*")[^"]+(")', rf'\g<1>{pid}\g<2>', text, count=1)
+          if count != 1:
+              raise SystemExit("persia2099_escrow entry not found in Anchor.toml")
+          cfg.write_text(text)
+          PY
+          echo "Program id declarations set."
 
       - name: Configure Rust toolchain
         shell: bash
@@ -79,11 +102,8 @@ jobs:
           unset RUSTUP_TOOLCHAIN
           rustup toolchain install 1.89.0 --profile minimal
           rustup default 1.89.0
-          echo "Rust toolchain:"
           rustup run 1.89.0 rustc --version
-          echo "Cargo:"
           rustup run 1.89.0 cargo --version
-          echo "Solana build tool:"
           cargo build-sbf --version
 
       - name: Build escrow program
@@ -91,7 +111,10 @@ jobs:
         shell: bash
         run: |
           export RUSTUP_TOOLCHAIN=1.89.0
-          echo "Building with the Solana SBF toolchain from Anchor 0.32.1."
+          echo "Rust:"
+          rustup run 1.89.0 rustc --version
+          echo "SBF builder:"
+          cargo build-sbf --version
           cargo build-sbf
 
       - name: Deploy escrow to Devnet
@@ -107,7 +130,7 @@ jobs:
       - name: Print deployed program id
         working-directory: escrow
         run: |
-          echo "Persia 2099 Escrow Program ID:"
           PROGRAM_ID=$(solana address -k target/deploy/persia2099_escrow-keypair.json)
+          echo "Persia 2099 Escrow Program ID:"
           echo "$PROGRAM_ID"
-          echo "Devnet Explorer: https://explorer.solana.com/address/${PROGRAM_ID}?cluster=devnet"
+          echo "Devnet Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
