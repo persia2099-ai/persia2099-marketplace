@@ -110,12 +110,16 @@ jobs:
         working-directory: escrow
         shell: bash
         run: |
-          export RUSTUP_TOOLCHAIN=1.85.0
-          rustup run 1.85.0 cargo generate-lockfile
-          rustup run 1.85.0 cargo update -p blake3 --precise 1.8.2
-          rustup run 1.85.0 cargo update -p constant_time_eq --precise 0.3.1
-          rustup run 1.85.0 cargo update -p base64ct --precise 1.7.3
-          rustup run 1.85.0 cargo update -p indexmap --precise 2.11.4
+          set -e
+          unset RUSTUP_TOOLCHAIN
+          rustup run 1.89.0 cargo generate-lockfile
+          rustup run 1.89.0 cargo update -p blake3 --precise 1.8.2
+          rustup run 1.89.0 cargo update -p constant_time_eq --precise 0.3.1
+          rustup run 1.89.0 cargo update -p base64ct --precise 1.7.3
+          rustup run 1.89.0 cargo update -p indexmap --precise 2.11.4
+          rustup run 1.89.0 cargo update -p wincode --precise 0.5.4
+          rustup run 1.89.0 cargo update -p wincode-derive --precise 0.4.6
+          echo "Locked dependency versions prepared."
 
       - name: Build escrow program
         working-directory: escrow
@@ -133,13 +137,11 @@ jobs:
         shell: bash
         run: |
           export RUSTUP_TOOLCHAIN=1.89.0
-          solana program deploy target/deploy/persia2099_escrow.so \
-            --program-id target/deploy/persia2099_escrow-keypair.json \
-            --url https://api.devnet.solana.com \
-            --keypair /tmp/deployer.json
+          solana program deploy target/deploy/persia2099_escrow.so             --program-id target/deploy/persia2099_escrow-keypair.json             --url https://api.devnet.solana.com             --keypair /tmp/deployer.json
 
       - name: Print deployed program id
         working-directory: escrow
+        shell: bash
         run: |
           PROGRAM_ID=$(solana address -k target/deploy/persia2099_escrow-keypair.json)
           echo "Persia 2099 Escrow Program ID:"
