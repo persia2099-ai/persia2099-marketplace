@@ -106,6 +106,17 @@ jobs:
           rustup run 1.89.0 cargo --version
           cargo build-sbf --version
 
+      - name: Prepare locked Rust dependencies
+        working-directory: escrow
+        shell: bash
+        run: |
+          export RUSTUP_TOOLCHAIN=1.85.0
+          rustup run 1.85.0 cargo generate-lockfile
+          rustup run 1.85.0 cargo update -p blake3 --precise 1.8.2
+          rustup run 1.85.0 cargo update -p constant_time_eq --precise 0.3.1
+          rustup run 1.85.0 cargo update -p base64ct --precise 1.7.3
+          rustup run 1.85.0 cargo update -p indexmap --precise 2.11.4
+
       - name: Build escrow program
         working-directory: escrow
         shell: bash
