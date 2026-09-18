@@ -2,9 +2,6 @@
 members = ["programs/persia2099-escrow"]
 resolver = "2"
 
-[workspace.metadata.solana]
-tools-version = "v1.47"
-
 [profile.release]
 opt-level = "z"
 lto = true
