@@ -116,8 +116,6 @@ jobs:
           rustup run 1.89.0 cargo update -p blake3 --precise 1.8.2
           rustup run 1.89.0 cargo update -p constant_time_eq --precise 0.3.1
           rustup run 1.89.0 cargo update -p base64ct --precise 1.7.3
-          rustup run 1.89.0 cargo update -p wincode --precise 0.5.4
-          rustup run 1.89.0 cargo update -p wincode-derive --precise 0.4.6
           echo "Locked dependency versions prepared."
 
       - name: Build escrow program
