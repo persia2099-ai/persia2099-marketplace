@@ -17,4 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.31.1"
-mpl-core = { version = "0.12.1", features = ["anchor"] }
+mpl-core = { version = "0.12.1", default-features = false, features = ["anchor"] }
