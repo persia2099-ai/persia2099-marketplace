@@ -7,6 +7,3 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 overflow-checks = true
-
-[package.metadata.solana]
-tools-version = "v1.52"
