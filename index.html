@@ -31,6 +31,7 @@ button:disabled{opacity:.45}
 <div class="subtitle">PERSIA 2099 — GENESIS GUARDIANS</div>
 
 <div class="status" id="status">Connect Phantom to begin.</div>
+<button id="connectBtn" onclick="connect()">CONNECT PHANTOM</button>
 
 <div class="grid">
 
@@ -91,6 +92,7 @@ button:disabled{opacity:.45}
 </div>
 
 <script>
+const ESCROW_PROGRAM_ID = "FmbUMNRwYMJA5kS4hz7G3CaFAsENgV1gPpYyoZ38EAdD";
 let wallet=null;
 
 async function connect(){
