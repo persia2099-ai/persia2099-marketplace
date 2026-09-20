@@ -127,7 +127,7 @@ jobs:
           rustup run 1.89.0 rustc --version
           echo "SBF builder:"
           cargo build-sbf --version
-          cargo build-sbf
+          cargo build-sbf --tools-version v1.52
 
       - name: Deploy escrow to Devnet
         working-directory: escrow
