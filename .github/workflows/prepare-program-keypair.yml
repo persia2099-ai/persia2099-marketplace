@@ -1,0 +1,47 @@
+name: Prepare Stable Escrow Program Keypair
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate stable Solana program keypair
+        shell: bash
+        run: |
+          set -e
+          mkdir -p out
+          python3 - <<'PY'
+          import json, os, secrets
+          # Generate a random 32-byte Solana seed and expand to the 64-byte
+          # secret-key format expected by Solana CLI.
+          seed = secrets.token_bytes(32)
+          # Solana/ed25519 secret key format is seed + public key.
+          # Use Node's built-in crypto for the public key derivation.
+          open("/tmp/seed.bin","wb").write(seed)
+          PY
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const seed = fs.readFileSync("/tmp/seed.bin");
+          // PKCS#8 wrapper for Ed25519 seed; extract raw 32-byte public key.
+          const der = Buffer.concat([
+            Buffer.from("302e020100300506032b657004220420","hex"),
+            seed
+          ]);
+          const key = crypto.createPrivateKey({key: der, format: "der", type: "pkcs8"});
+          const pub = crypto.createPublicKey(key).export({format:"der",type:"spki"});
+          const publicKey = pub.subarray(pub.length-32);
+          const secret = Buffer.concat([seed, publicKey]);
+          fs.writeFileSync("out/PROGRAM_KEYPAIR.json", JSON.stringify(Array.from(secret)));
+          console.log("PROGRAM ID:", Buffer.from(publicKey).toString("base64"));
+          NODE
+          chmod 600 out/PROGRAM_KEYPAIR.json
+
+      - name: Upload keypair artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stable-program-keypair
+          path: out/PROGRAM_KEYPAIR.json
+          retention-days: 1
