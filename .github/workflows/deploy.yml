@@ -63,19 +63,57 @@ jobs:
           echo "Deployer balance:"
           solana balance
 
-      - name: Generate program keypair
+      - name: Configure stable program keypair
         shell: bash
+        env:
+          PROGRAM_KEYPAIR: ${{ secrets.PROGRAM_KEYPAIR }}
         run: |
+          set -e
+          if [ -z "$PROGRAM_KEYPAIR" ]; then
+            echo "Missing PROGRAM_KEYPAIR GitHub Actions secret."
+            exit 1
+          fi
           mkdir -p escrow/target/deploy
-          solana-keygen new --no-bip39-passphrase --silent --outfile escrow/target/deploy/persia2099_escrow-keypair.json
+          python3 - <<'PY'
+          import json, os, re, sys
+          s = os.environ["PROGRAM_KEYPAIR"].strip().strip('"\'')
+          raw = None
+          try:
+              candidate = json.loads(s)
+              if isinstance(candidate, list) and len(candidate) == 64 and all(isinstance(x, int) and 0 <= x <= 255 for x in candidate):
+                  raw = bytes(candidate)
+          except Exception:
+              pass
+          if raw is None and re.fullmatch(r'(?:0x)?[0-9a-fA-F]{128}', s):
+              raw = bytes.fromhex(s[2:] if s.startswith('0x') else s)
+          if raw is None:
+              alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+              index = {c:i for i,c in enumerate(alphabet)}
+              n = 0
+              for c in s:
+                  if c not in index:
+                      raise SystemExit("Invalid PROGRAM_KEYPAIR format.")
+                  n = n * 58 + index[c]
+              raw = b'\x00' * (len(s) - len(s.lstrip('1'))) + n.to_bytes((n.bit_length()+7)//8, 'big')
+          if len(raw) != 64:
+              raise SystemExit("PROGRAM_KEYPAIR must decode to a 64-byte Solana secret key.")
+          with open('escrow/target/deploy/persia2099_escrow-keypair.json', 'w') as f:
+              json.dump(list(raw), f)
+          PY
+          chmod 600 escrow/target/deploy/persia2099_escrow-keypair.json
+          PROGRAM_ID=$(solana-keygen pubkey escrow/target/deploy/persia2099_escrow-keypair.json)
+          echo "Stable Program ID: $PROGRAM_ID"
+          test "$PROGRAM_ID" = "4nwK6KMgGFAi1j363GSyi1vMfwQaL2iT5vELJJY6ZuHo" || {
+            echo "PROGRAM_KEYPAIR does not match the expected stable Program ID."
+            exit 1
+          }
 
-      - name: Set program id
+      - name: Configure program id
         working-directory: escrow
         shell: bash
         run: |
           set -e
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/persia2099_escrow-keypair.json)
-          echo "Program ID: $PROGRAM_ID"
           python3 - "$PROGRAM_ID" <<'PY'
           import pathlib, re, sys
           pid = sys.argv[1]
@@ -94,7 +132,6 @@ jobs:
               raise SystemExit("persia2099_escrow entry not found in Anchor.toml")
           cfg.write_text(text)
           PY
-          echo "Program id declarations set."
 
       - name: Configure Rust toolchain
         shell: bash
@@ -123,10 +160,6 @@ jobs:
         shell: bash
         run: |
           export RUSTUP_TOOLCHAIN=1.89.0
-          echo "Rust:"
-          rustup run 1.89.0 rustc --version
-          echo "SBF builder:"
-          cargo build-sbf --version
           cargo build-sbf --tools-version v1.52
 
       - name: Deploy escrow to Devnet
@@ -136,11 +169,12 @@ jobs:
           export RUSTUP_TOOLCHAIN=1.89.0
           solana program deploy target/deploy/persia2099_escrow.so             --program-id target/deploy/persia2099_escrow-keypair.json             --url https://api.devnet.solana.com             --keypair /tmp/deployer.json
 
-      - name: Print deployed program id
+      - name: Verify deployed program
         working-directory: escrow
         shell: bash
         run: |
+          set -e
           PROGRAM_ID=$(solana address -k target/deploy/persia2099_escrow-keypair.json)
-          echo "Persia 2099 Escrow Program ID:"
-          echo "$PROGRAM_ID"
+          echo "Persia 2099 Escrow Program ID: $PROGRAM_ID"
+          solana program show "$PROGRAM_ID" --url https://api.devnet.solana.com
           echo "Devnet Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
