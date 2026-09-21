@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{self, Transfer};
 use mpl_core::instructions::TransferV1CpiBuilder;
 
-declare_id!("FmbUMNRwYMJA5kS4hz7G3CaFAsENgV1gPpYyoZ38EAdD");
+declare_id!("4nwK6KMgGFAi1j363GSyi1vMfwQaL2iT5vELJJY6ZuHo");
 
 pub const COLLECTION: Pubkey = pubkey!("6XGhHkPAHJ5XayXwn1p7t3XEUmyYEx3racfwnpbEwp6a");
 
