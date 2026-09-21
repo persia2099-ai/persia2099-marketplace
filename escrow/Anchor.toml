@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-persia2099_escrow = "FmbUMNRwYMJA5kS4hz7G3CaFAsENgV1gPpYyoZ38EAdD"
+persia2099_escrow = "4nwK6KMgGFAi1j363GSyi1vMfwQaL2iT5vELJJY6ZuHo"
 
 [provider]
 cluster = "devnet"
